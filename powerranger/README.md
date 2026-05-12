@@ -12,11 +12,6 @@ A one-click toggle button for the in-game **Custom Clone Mode** option. Saves yo
 - Draggable, with position persisted to disk.
 - Visual state changes to reflect current toggle.
 
-## Installation
-
-1. Copy the `powerranger` folder into your ArcheRage `addon` directory.
-2. Launch the game — the addon loads automatically.
-
 ## Usage
 
 Click to toggle. Drag to relocate the button.

@@ -12,11 +12,6 @@ Displays the number of free slots in your bag at a glance. No more opening the i
 - Updates as you loot, sell, or move items.
 - Position remembered between sessions.
 
-## Installation
-
-1. Copy the `bagslotcount` folder into your ArcheRage `addon` directory.
-2. Launch the game — the addon loads automatically.
-
 ## Usage
 
 Drag the window to wherever you want it on screen.

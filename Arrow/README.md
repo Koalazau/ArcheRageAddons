@@ -13,11 +13,6 @@ An on-screen directional indicator that always points to your current target. Wh
 - On-screen mode anchors the arrow above the target pointing down.
 - UI-scale aware so positioning stays consistent at any resolution.
 
-## Installation
-
-1. Copy the `Arrow` folder into your ArcheRage `addon` directory.
-2. Launch the game — the addon loads automatically.
-
 ## Usage
 
 Select any unit. The arrow appears as long as you have a valid target and disappears when no target is selected.

@@ -14,11 +14,6 @@ Automatically swaps the keybind on your mode action-bar slot when a specific gli
 - Cooldown protection prevents accidental rapid re-swaps.
 - Optional debug mode to verify swaps in chat.
 
-## Installation
-
-1. Copy the `keybindswaps` folder into your ArcheRage `addon` directory.
-2. Launch the game — the addon loads automatically.
-
 ## Usage
 
 Configure glider profiles via the in-game UI (`ui.lua`). When a profiled glider activates, the bound key changes; when the glider ends, the original bind is restored.

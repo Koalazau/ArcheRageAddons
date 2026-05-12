@@ -13,11 +13,6 @@ A gear / costume preset manager. Build loadouts for different situations — PvE
 - Drag-and-drop UI built on combo boxes and labelled buttons.
 - Customizable hotkeys via the in-game API.
 
-## Installation
-
-1. Copy the `combatcloset` folder into your ArcheRage `addon` directory.
-2. Launch the game — the addon loads automatically.
-
 ## Usage
 
 Open the closet window, configure presets for each situation, and switch presets with the dedicated icons or your bound hotkey.

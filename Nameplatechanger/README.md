@@ -12,11 +12,6 @@ Customizes the appearance and behavior of in-game nameplates. Resize, recolor, a
 - Color customization (see `color.txt` for reference values).
 - Per-class mapping support via the `globals` folder.
 
-## Installation
-
-1. Copy the `Nameplatechanger` folder into your ArcheRage `addon` directory.
-2. Launch the game — the addon loads automatically.
-
 ## Usage
 
 Open the settings window and adjust nameplate styling. Changes apply on the fly.

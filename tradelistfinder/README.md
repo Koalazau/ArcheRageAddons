@@ -13,11 +13,6 @@ Browse housing for sale across continents and zones from inside the game. Lists 
 - Paginated list with a draggable, position-saving window.
 - Custom button icons.
 
-## Installation
-
-1. Copy the `tradelistfinder` folder into your ArcheRage `addon` directory.
-2. Launch the game — the addon loads automatically.
-
 ## Usage
 
 Click the toggle button to open the search window, pick a continent and zone, and review listed houses for sale.

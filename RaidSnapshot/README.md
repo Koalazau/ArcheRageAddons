@@ -14,11 +14,6 @@ Records snapshots of raid composition during an event — who joined, who left, 
 - Class mapping support (`classmappings.lua`) so logs include readable class info.
 - Event picker combo box to select which raid to record.
 
-## Installation
-
-1. Copy the `RaidSnapshot` folder into your ArcheRage `addon` directory.
-2. Launch the game — the addon loads automatically.
-
 ## Usage
 
 Open the window, pick the event you're running, and start a session. Snapshot files are saved locally and can be reviewed any time.

@@ -8,10 +8,12 @@ Displays the number of free slots in your bag at a glance. No more opening the i
 
 ## Features
 
-- Live free-slot counter in a draggable on-screen window.
+- Live free-slot counter in a movable window with commands.
 - Updates as you loot, sell, or move items.
 - Position remembered between sessions.
 
 ## Usage
 
-Drag the window to wherever you want it on screen.
+Commands
+!bags up/down/left/right number Example
+!bags up 200 moves the bag number up 200 pixels.

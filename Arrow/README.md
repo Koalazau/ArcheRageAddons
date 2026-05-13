@@ -4,7 +4,7 @@ An on-screen directional indicator that always points to your current target. Wh
 
 ## Preview
 
-![Arrow](image/imagename.png)
+![Arrow](../img/Arrow.png)
 
 ## Features
 

@@ -4,7 +4,7 @@ Displays the number of free slots in your bag at a glance. No more opening the i
 
 ## Preview
 
-![bagslotcount](image/imagename.png)
+![bagslotcount](../img/Bagcount.png)
 
 ## Features
 

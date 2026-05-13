@@ -4,7 +4,9 @@ A gear / costume preset manager. Build loadouts for different situations — PvE
 
 ## Preview
 
-![combatcloset](image/imagename.png)
+![combatcloset](../img/Combatcloset1.png)
+![combatcloset](../img/CombatCloset2.png)
+![combatcloset](../img/CombatCloset3.png)
 
 ## Features
 

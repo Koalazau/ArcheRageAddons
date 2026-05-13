@@ -4,7 +4,7 @@ Browse housing for sale across continents and zones from inside the game. Lists 
 
 ## Preview
 
-![tradelistfinder](image/imagename.png)
+![tradelistfinder](../img/tradelistfinder.png)
 
 ## Features
 

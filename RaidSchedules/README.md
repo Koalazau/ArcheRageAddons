@@ -4,7 +4,7 @@ A visual schedule of server, zone, and game events with icons for each raid boss
 
 ## Preview
 
-![RaidSchedules](image/imagename.png)
+![RaidSchedules](../img/raidschedules.png)
 
 ## Features
 

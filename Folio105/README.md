@@ -4,7 +4,7 @@ A trade pack helper that displays pack prices and resource information between z
 
 ## Preview
 
-![Folio105](image/imagename.png)
+![Folio105](../img/Folio.png)
 
 ## Features
 

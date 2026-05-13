@@ -4,7 +4,7 @@ Scans your inventory for treasure maps and shows them in a dedicated window with
 
 ## Preview
 
-![TreasureMapHunter](image/imagename.png)
+![TreasureMapHunter](../img/treasuremaphunter.png)
 
 ## Features
 

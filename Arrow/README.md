@@ -17,6 +17,3 @@ An on-screen directional indicator that always points to your current target. Wh
 
 Select any unit. The arrow appears as long as you have a valid target and disappears when no target is selected.
 
-## Credits
-
-Original script by Strawberry (Discord: exec_noir). Modified for screen-aware behavior and UI scaling.

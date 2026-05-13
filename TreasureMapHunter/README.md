@@ -16,3 +16,6 @@ Scans your inventory for treasure maps and shows them in a dedicated window with
 ## Usage
 
 Open the window from its toggle button. Select a map to display it; the compass will guide you toward the target location.
+
+## Note
+Test button is an experimental opening of the map and displaying a ping using the in-game map system.

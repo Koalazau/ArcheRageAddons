@@ -14,6 +14,7 @@ ADDON:ImportObject(OBJECT_TYPE.WEBBROWSER)
 ADDON:ImportAPI(API_TYPE.CHAT.id)
 ADDON:ImportAPI(API_TYPE.UNIT.id)
 ADDON:ImportAPI(API_TYPE.BAG.id)
+ADDON:ImportAPI(API_TYPE.MAP.id)
 
 local treasureMapWindow = nil
 local compassWindow = nil
@@ -378,9 +379,8 @@ local function CreateCompassWindow()
     local webMapButton = compassWindow:CreateChildWidget("button", "webMapButton", 0, true)
     webMapButton:SetStyle("text_default")
     webMapButton:AddAnchor("BOTTOMLEFT", compassWindow, 10, -10)
-    webMapButton:AddAnchor("BOTTOMRIGHT", compassWindow, -10, -10)
     webMapButton:SetText("Web Map")
-    webMapButton:SetHeight(32)
+    webMapButton:SetExtent(90, 32)
     webMapButton:Show(true)
 
     function webMapButton:OnClick()
@@ -391,6 +391,28 @@ local function CreateCompassWindow()
         end
     end
     webMapButton:SetHandler("OnClick", webMapButton.OnClick)
+
+    local testButton = compassWindow:CreateChildWidget("button", "testButton", 0, true)
+    testButton:SetStyle("text_default")
+    testButton:AddAnchor("BOTTOMRIGHT", compassWindow, -10, -10)
+    testButton:SetText("Test")
+    testButton:SetExtent(90, 32)
+    testButton:Show(true)
+
+    function testButton:OnClick()
+        if currentTarget then
+            local targetX, targetY = parseCoordinates(currentTarget)
+            if targetX and targetY then
+                local zoneGroupId = X2Unit:GetCurrentZoneGroup()
+                if zoneGroupId == nil then
+                    zoneGroupId = 0
+                end
+
+                X2Map:ShowWorldmapLocation(zoneGroupId, targetX, targetY, 0)
+            end
+        end
+    end
+    testButton:SetHandler("OnClick", testButton.OnClick)
 
     local directions = {"N", "NE", "E", "SE", "S", "SW", "W", "NW"}
     local positions = {

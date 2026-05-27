@@ -41,8 +41,11 @@ local ROW_GAP          = 2
 local DELETE_RESERVE   = 24
 local PANEL_HEIGHT     = LIST_TOP_Y + VISIBLE_ROWS * ROW_HEIGHT + 64
 
-local ROW_TEXT_DEFAULT = { 0.88, 0.88, 0.88, 1.0 }
-local ROW_TEXT_HOVER   = { 0.45, 1.00, 0.45, 1.0 }
+local DARK              = isUserDarkMode()
+local TITLE_COLOR       = DARK and { 1.0,  0.95, 0.7, 1.0 } or { 0.0,  0.0,  0.0, 1.0 }
+local ROW_TEXT_DEFAULT  = DARK and { 0.88, 0.88, 0.88, 1.0 } or { 0.0,  0.0,  0.0, 1.0 }
+local ROW_TEXT_HOVER    = DARK and { 0.45, 1.00, 0.45, 1.0 } or { 0.0,  0.55, 0.0, 1.0 }
+local INPUT_TEXT_COLOR  = DARK and { 1.0,  1.0,  1.0, 1.0 } or { 0.0,  0.0,  0.0, 1.0 }
 
 local function trim(s)
     return (s or ""):gsub("\n", ""):match("^%s*(.-)%s*$") or ""
@@ -134,7 +137,7 @@ titleBar:AddAnchor("TOPRIGHT", bagPanel, 0, TITLE_Y - 14)
 titleBar:SetHeight(28)
 titleBar.titleStyle:SetAlign(ALIGN_CENTER)
 titleBar.titleStyle:SetFontSize(15)
-titleBar.titleStyle:SetColor(1.0, 0.95, 0.7, 1.0)
+titleBar.titleStyle:SetColor(unpack(TITLE_COLOR))
 titleBar:SetTitleText("Auction Favorites")
 titleBar:Show(true)
 
@@ -341,19 +344,24 @@ local function ShowAddPopup()
     popDeco:AddAnchor("TOPLEFT",  addPopup, 0, -5)
     popDeco:AddAnchor("TOPRIGHT", addPopup, 0, -5)
 
-    local title = addPopup:CreateChildWidget("label", "popTitle", 0, true)
-    title.style:SetFontSize(14)
-    title.style:SetColor(1, 0.95, 0.7, 1)
-    title.style:SetOutline(true)
-    title.style:SetAlign(ALIGN_CENTER)
-    title:SetExtent(280, 20)
-    title:AddAnchor("TOP", addPopup, 0, 14)
-    title:SetText("Add Favorite Search")
+    local title = addPopup:CreateChildWidget("window", "popTitleBar", 0, true)
+    title:AddAnchor("TOPLEFT",  addPopup, 0, 14)
+    title:AddAnchor("TOPRIGHT", addPopup, 0, 14)
+    title:SetHeight(28)
+    title.titleStyle:SetAlign(ALIGN_CENTER)
+    title.titleStyle:SetFontSize(15)
+    title.titleStyle:SetColor(unpack(TITLE_COLOR))
+    title:SetTitleText("Add Favorite Search")
+    title:Show(true)
 
     local input = addPopup:CreateChildWidget("editboxmultiline", "popInput", 0, true)
     input:SetExtent(260, 28)
     input:AddAnchor("CENTER", addPopup, 0, 0)
     input.style:SetFontSize(14)
+    input.style:SetColor(unpack(INPUT_TEXT_COLOR))
+    input:SetCursorColor(unpack(INPUT_TEXT_COLOR))
+    input:SetCursorHeight(-2)
+    input:SetCursorOffset(-3)
     input:SetMaxTextLength(64)
     addPopup.input = input
 

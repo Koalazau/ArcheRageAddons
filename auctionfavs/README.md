@@ -24,10 +24,8 @@ A small ArcheRage addon that adds a saved-searches panel to the Auction House. P
 
 ## How the hotkey works
 
-The engine's `HOTKEY_ACTION` event only fires for actions explicitly bound via `X2Hotkey:SetBindingUiEvent` from an addon — built-in keybinds don't emit it. There's also no way to non-destructively listen to a key already bound to another action.
+The current usage of ADDON:GetContentMainScriptPosVis only work's with certain UIC_* that have a specific line of code added to their actual function in the game files, Until that has been fixed for UIC_AUCTION this is what I have had to do to make it work.
 
 To work around this, AuctionFavs reads whatever key you have bound to `toggle_auction` ("Enter Auction House") and re-binds that key to its own custom action. When you press the key, the addon's handler fires `HOTKEY_ACTION`, then calls `ADDON:ToggleContent(UIC_AUCTION)` so the auction window still opens normally.
 
 **Caveat**: if you disable the addon, the bound key will no longer open the auction window — re-bind "Enter Auction House" in the keybinds menu to restore it.
-
-Until then it'll show as a broken image link — that's fine, the addon doesn't depend on it.

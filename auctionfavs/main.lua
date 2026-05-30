@@ -59,7 +59,7 @@ local favorites = {}
 
 local function SaveFavorites()
     ADDON:SaveData(FAV_SAVE_KEY, favorites)
-    local f = io.open(FAV_FILE_PATH, "w")
+    local f = io.open(FAV_FILE_PATH, "wb")
     if f then
         for _, fav in ipairs(favorites) do
             if fav.text and fav.text ~= "" then
@@ -71,7 +71,7 @@ local function SaveFavorites()
 end
 
 local function LoadFavorites()
-    local f = io.open(FAV_FILE_PATH, "r")
+    local f = io.open(FAV_FILE_PATH, "rb")
     if f then
         favorites = {}
         for line in f:lines() do
@@ -236,7 +236,7 @@ slider:SetValue(0, false)
 local function DoSearch(keyword)
     keyword = trim(keyword)
     if keyword == "" then return end
-    X2Auction:SearchAuctionArticle(1, 0, 55, 1, 0, false, keyword, "0", "99999999999")
+    X2Auction:SearchAuctionArticle(1, 0, 55, 1, 0, false, keyword, "0", "0")
 end
 
 local function RenderList(syncSlider)
@@ -429,27 +429,10 @@ bagPanel:SetHandler("OnCloseByEsc", function()
     panelVisible = false
 end)
 
-local AUCTION_EVENTS = {
-    "AUCTION_ITEM_SEARCH",
-    "AUCTION_ITEM_SEARCHED",
-    "AUCTION_ITEM_PUT_UP",
-    "AUCTION_BIDDED",
-    "AUCTION_BIDDEN",
-    "AUCTION_BOUGHT",
-    "AUCTION_BOUGHT_BY_SOMEONE",
-    "AUCTION_CANCELED",
-    "AUCTION_LOWEST_PRICE",
-    "AUCTION_PERMISSION_BY_CRAFT",
-    "AUCTION_CHARACTER_LEVEL_TOO_LOW",
-}
-for _, ev in ipairs(AUCTION_EVENTS) do
-    UIParent:SetEventHandler(ev, ShowPanel)
-end
+UIParent:SetEventHandler("AUCTION_ITEM_SEARCHED", ShowPanel)
 
 UIParent:SetEventHandler("AUCTION_ITEM_ATTACHMENT_STATE_CHANGED", function(attached)
-    if attached then
-        ShowPanel()
-    else
+    if not attached then
         closeJustFired = true
         HidePanel()
     end

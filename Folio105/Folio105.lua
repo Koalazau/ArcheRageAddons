@@ -7,16 +7,13 @@ ADDON:ImportObject(OBJECT_TYPE.WINDOW)
 ADDON:ImportObject(OBJECT_TYPE.LABEL)
 ADDON:ImportObject(OBJECT_TYPE.ICON_DRAWABLE)
 ADDON:ImportObject(OBJECT_TYPE.IMAGE_DRAWABLE)
-ADDON:ImportObject(OBJECT_TYPE.WEBBROWSER)
 
 ADDON:ImportAPI(API_TYPE.CHAT.id)
 ADDON:ImportAPI(API_TYPE.UNIT.id)
 ADDON:ImportAPI(API_TYPE.LOCALE.id)
 ADDON:ImportAPI(API_TYPE.STORE.id)
 ADDON:ImportAPI(API_TYPE.ABILITY.id)
-ADDON:ImportAPI(API_TYPE.AUCTION.id) 
-
-local ADDON_VERSION = "1.6"
+ADDON:ImportAPI(API_TYPE.AUCTION.id)
 
 local localizedName = {}
 local mainWindow = nil
@@ -99,8 +96,6 @@ local lastFromZoneForToZoneComboBox = {}
 
 local drawableNmyIcons = {}
 local drawableNmyLabels = {}
-
-local versionWindow = nil
 
 local color = {
     normal = UIParent:GetFontColor("btn_df"),
@@ -724,7 +719,9 @@ local function drawIcon(w, iconPath, id, xOffset, yOffset, ratio, packName)
         end
     end
 
-    local profitPerPack = calculatedPrice - totalResourceCostPerPack
+    -- calculatedPrice is nil when this pack has no base price for the
+    -- destination; treat as 0 so we never do nil arithmetic.
+    local profitPerPack = (calculatedPrice or 0) - totalResourceCostPerPack
 
     if drawableNmyIcons[id] ~= nil then
         drawableNmyIcons[id]:SetVisible(true)
@@ -977,11 +974,12 @@ local function drawIcon(w, iconPath, id, xOffset, yOffset, ratio, packName)
 end
 
 local function resetZoneSelectionsAndDisplays()
+    CancelPendingAuctions()
     selectedFromZone = nil
     selectedToZone = nil
     fromZoneGroup = nil
     toZoneGroup = nil
-    lastFromZoneForToZoneComboBox = {} 
+    lastFromZoneForToZoneComboBox = {}
 
     packRatio = {}
     for k, v in pairs(drawableNmyIcons) do if v then v:SetVisible(false) end drawableNmyIcons[k] = nil end
@@ -1069,6 +1067,15 @@ local function resetZoneSelectionsAndDisplays()
     if profitLabel then profitLabel:Show(false) end
 end
 
+-- Drop any in-flight auction price lookups. Called whenever the zone
+-- selection changes so a late AUCTION_ITEM_SEARCHED event can't run against
+-- a now-cleared destination (which produced a nil price -> nil arithmetic crash).
+function CancelPendingAuctions()
+    auctionRequestQueue = {}
+    isProcessingAuction = false
+    if loadingLabel then loadingLabel:Show(false) end
+end
+
 function ProcessNextAuctionRequest()
     if #auctionRequestQueue == 0 then
         isProcessingAuction = false
@@ -1099,8 +1106,14 @@ function StartAuctionRequests(resourceList)
 end
 
 function OnAuctionItemSearched()
+    -- A pending lookup can fire after the zone selection was cleared/changed.
+    -- Without a valid destination there is no base price, so skip it entirely.
+    if not selectedFromZone or not selectedToZone or not toZoneGroup then
+        return
+    end
+
     local count = X2Auction:GetSearchedItemCount()
-        
+
     if count > 0 then
         local itemInfo = X2Auction:GetSearchedItemInfo(1)
         local unitPrice = tonumber(itemInfo.bidPriceStr) or 0 
@@ -1138,8 +1151,7 @@ function OnAuctionItemSearched()
                         if basePrice then
                             calculatedPrice = CalculatePrice(basePrice, packData.ratio, packName)
                         end
-                        local profitPerPack = calculatedPrice - totalResourceCostPerPack
-                        
+
                         if drawableResourceCostCurrencyComponents[k] then
                             for i, resource in ipairs(resourcesList) do
                                 if drawableResourceCostCurrencyComponents[k][i] and packData.resourceLineYPositions and packData.resourceLineYPositions[i] then
@@ -1154,7 +1166,10 @@ function OnAuctionItemSearched()
                             positionAndDisplayCurrency(mainWindow, drawablePackCostCurrencyComponents[k], 680, packData.packCostYPosition, packCostGold, packCostSilver, packCostCopper, true)
                         end
                         
-                        if drawableProfitCurrencyComponents[k] and packData.profitYPosition then
+                        -- Profit needs a base price; resource/pack costs above
+                        -- still render when one is missing (nil -> skip profit).
+                        if calculatedPrice and drawableProfitCurrencyComponents[k] and packData.profitYPosition then
+                            local profitPerPack = calculatedPrice - totalResourceCostPerPack
                             local profitGold, profitSilver, profitCopper = CopperToGSC(profitPerPack)
 
                             if profitPerPack >= 0 then
@@ -1198,71 +1213,315 @@ function UpdateWindowHeight()
     mainWindow:SetExtent(windowX, newHeight)
 end
 
-local function CreateVersionWindow()
-    if versionWindow then
-        return versionWindow
-    end
+-- ============================================================
+-- Favorites: save/load and apply trade routes
+-- A favorite = { continent = "Nuia"/"Haranya"/"Auroria", fromZone, toZone }
+-- ============================================================
+local favorites = {}
+local FAVORITES_SAVE_KEY = "folioFavorites"
+local favoritesWindow = nil
+local favRowWidgets = {}
+local favEmptyLabel = nil
+local favScrollOffset = 0
+local favSlider = nil
+local favSliderFrame = nil
+local FAV_WINDOW_WIDTH = 380
+local FAV_ROW_HEIGHT = 34
+local FAV_MAX_VISIBLE = 8
+local FAV_SLIDER_W = 18
 
-    versionWindow = CreateEmptyWindow("folio105VersionWindow", "UIParent")
-    versionWindow:SetExtent(660, 640)
-    versionWindow:AddAnchor("CENTER", "UIParent", 0, 0)
-    versionWindow:EnableDrag(true)
-    versionWindow:SetCloseOnEscape(true)
-    
-    function versionWindow:OnShow()
-        SettingWindowSkin(versionWindow)
-        versionWindow:SetStartAnimation(true, true)
+local function ZoneDisplayName(zoneId)
+    if zoneId == 33 then return "Heedmar" end
+    if localizedName.zoneGroupName and localizedName.zoneGroupName[zoneId] then
+        return localizedName.zoneGroupName[zoneId]
     end
-    versionWindow:SetHandler("OnShow", versionWindow.OnShow)
-    
-    function versionWindow:OnDragStart()
-        self:StartMoving()
-        self.moving = true
-    end
-    versionWindow:SetHandler("OnDragStart", versionWindow.OnDragStart)
-
-    function versionWindow:OnDragStop()
-        self:StopMovingOrSizing()
-        self.moving = false
-    end
-    versionWindow:SetHandler("OnDragStop", versionWindow.OnDragStop)
-    
-    local closeButton = versionWindow:CreateChildWidget("button", "closeButton", 0, true)
-    closeButton:SetStyle("text_default")
-    closeButton:AddAnchor("TOPRIGHT", versionWindow, -10, 5)
-    closeButton:SetText("X")
-    closeButton:SetExtent(30, 20)
-    closeButton:Show(true)
-    
-    function closeButton:OnClick()
-        versionWindow:Show(false)
-    end
-    closeButton:SetHandler("OnClick", closeButton.OnClick)
-    
-    local webbrowser = UIParent:CreateWidget("webbrowser", "folio105_webbrowser", versionWindow)
-    webbrowser:SetExtent(650, 600)
-    webbrowser:AddAnchor("TOP", versionWindow, 0, 35)
-    webbrowser:Show(true)
-    versionWindow.webbrowser = webbrowser
-    versionWindow:SetHandler("OnWheelUp", function() webbrowser:WheelUp() end)
-    versionWindow:SetHandler("OnWheelDown", function() webbrowser:WheelDown() end)
-    
-    return versionWindow
+    return "Zone " .. tostring(zoneId)
 end
 
-local function CheckAddonVersion()
-    local window = CreateVersionWindow()
-    
-    if window:IsVisible() then
-        window:Show(false)
+-- Favorites are persisted via the engine's per-character managed store
+-- (ADDON:SaveData/LoadData), not a flat file.
+local function SaveFavorites()
+    ADDON:SaveData(FAVORITES_SAVE_KEY, favorites)
+end
+
+local function LoadFavorites()
+    favorites = {}
+    local saved = ADDON:LoadData(FAVORITES_SAVE_KEY)
+    if type(saved) == "table" then
+        for _, fav in ipairs(saved) do
+            if type(fav) == "table" and fav.continent and fav.fromZone and fav.toZone then
+                table.insert(favorites, {
+                    continent = fav.continent,
+                    fromZone = tonumber(fav.fromZone),
+                    toZone = tonumber(fav.toZone),
+                })
+            end
+        end
+    end
+end
+
+local function AddCurrentFavorite()
+    if not currentContinent or not selectedFromZone or not selectedToZone then
+        X2Chat:DispatchChatMessage(CMF_SYSTEM, "|cFFFFAA00[Folio] Pick a From and To zone before adding a favorite.|r")
+        return
+    end
+    for _, fav in ipairs(favorites) do
+        if fav.continent == currentContinent and fav.fromZone == selectedFromZone and fav.toZone == selectedToZone then
+            X2Chat:DispatchChatMessage(CMF_SYSTEM, "|cFFFFAA00[Folio] That route is already a favorite.|r")
+            return
+        end
+    end
+    table.insert(favorites, { continent = currentContinent, fromZone = selectedFromZone, toZone = selectedToZone })
+    SaveFavorites()
+    RefreshFavoritesList()
+end
+
+local function RemoveFavorite(index)
+    if favorites[index] then
+        table.remove(favorites, index)
+        SaveFavorites()
+        RefreshFavoritesList()
+    end
+end
+
+-- Repopulate the visible favorite rows from the favorites table + scroll offset.
+-- syncSlider defaults true; pass false from the slider handler to avoid a feedback loop.
+function RefreshFavoritesList(syncSlider)
+    if not favoritesWindow then return end
+    if syncSlider == nil then syncSlider = true end
+
+    local count = #favorites
+    local maxOffset = math.max(0, count - FAV_MAX_VISIBLE)
+    if favScrollOffset > maxOffset then favScrollOffset = maxOffset end
+    if favScrollOffset < 0 then favScrollOffset = 0 end
+
+    if favSlider and syncSlider then
+        favSlider:SetMinMaxValues(0, maxOffset)
+        favSlider:SetValue(favScrollOffset, false)
+    end
+    if favSliderFrame then
+        favSliderFrame:Show(maxOffset > 0)
+    end
+
+    if favEmptyLabel then favEmptyLabel:Show(count == 0) end
+
+    for i = 1, FAV_MAX_VISIBLE do
+        local widgets = favRowWidgets[i]
+        local favIndex = i + favScrollOffset
+        local fav = favorites[favIndex]
+        if widgets and fav then
+            widgets.label:SetText(string.format("%s  >  %s", ZoneDisplayName(fav.fromZone), ZoneDisplayName(fav.toZone)))
+            widgets.label.style:SetColorByKey("brown")
+            widgets.applyBtn:SetHandler("OnClick", function()
+                ApplyFavoriteRoute(fav.continent, fav.fromZone, fav.toZone)
+            end)
+            widgets.applyBtn:SetHandler("OnEnter", function()
+                widgets.label.style:SetColor(0.45, 1.0, 0.45, 1)
+            end)
+            widgets.applyBtn:SetHandler("OnLeave", function()
+                widgets.label.style:SetColorByKey("brown")
+            end)
+            widgets.removeBtn:SetHandler("OnClick", function()
+                RemoveFavorite(favIndex)
+            end)
+            widgets.row:Show(true)
+        elseif widgets then
+            widgets.row:Show(false)
+        end
+    end
+end
+
+function CreateFavoritesWindow()
+    if favoritesWindow then return favoritesWindow end
+    if not mainWindow then return nil end
+
+    -- Child of mainWindow, anchored to its right edge: it stays attached and
+    -- follows automatically whenever the Folio window is dragged.
+    favoritesWindow = CreateEmptyWindow("folio105FavoritesWindow", mainWindow)
+    favoritesWindow:SetExtent(FAV_WINDOW_WIDTH, 100 + FAV_MAX_VISIBLE * FAV_ROW_HEIGHT)
+    favoritesWindow:AddAnchor("TOPLEFT", mainWindow, "TOPRIGHT", 8, 0)
+    favoritesWindow:SetCloseOnEscape(true)
+
+    function favoritesWindow:OnShow()
+        SettingWindowSkin(favoritesWindow)
+        favoritesWindow:SetStartAnimation(true, true)
+    end
+    favoritesWindow:SetHandler("OnShow", favoritesWindow.OnShow)
+
+    -- Centered title (engine-native titleBar pattern from CLAUDE.md).
+    local titleBar = favoritesWindow:CreateChildWidget("window", "favTitleBar", 0, true)
+    titleBar:AddAnchor("TOPLEFT", favoritesWindow, 0, 14)
+    titleBar:AddAnchor("TOPRIGHT", favoritesWindow, 0, 14)
+    titleBar:SetHeight(28)
+    titleBar.titleStyle:SetAlign(ALIGN_CENTER)
+    titleBar.titleStyle:SetFontSize(18)
+    titleBar.titleStyle:SetColorByKey("brown")
+    titleBar:SetTitleText("Favorites")
+    titleBar:Show(true)
+
+    local closeButton = favoritesWindow:CreateChildWidget("button", "favCloseButton", 0, true)
+    closeButton:SetStyle("text_default")
+    closeButton:AddAnchor("TOPRIGHT", favoritesWindow, -10, 8)
+    closeButton:SetText("X")
+    closeButton:SetExtent(30, 22)
+    closeButton:Show(true)
+    function closeButton:OnClick()
+        favoritesWindow:Show(false)
+    end
+    closeButton:SetHandler("OnClick", closeButton.OnClick)
+
+    local addButton = favoritesWindow:CreateChildWidget("button", "favAddButton", 0, true)
+    addButton:SetStyle("text_default")
+    addButton:AddAnchor("TOP", favoritesWindow, 0, 48)
+    addButton:SetText("+ Add Current Route")
+    addButton:SetExtent(220, 28)
+    addButton:Show(true)
+    function addButton:OnClick()
+        AddCurrentFavorite()
+    end
+    addButton:SetHandler("OnClick", addButton.OnClick)
+
+    favEmptyLabel = favoritesWindow:CreateChildWidget("label", "favEmptyLabel", 0, true)
+    favEmptyLabel:AddAnchor("TOP", favoritesWindow, 0, 110)
+    favEmptyLabel.style:SetAlign(ALIGN_CENTER)
+    favEmptyLabel.style:SetFontSize(13)
+    favEmptyLabel.style:SetColor(0.85, 0.85, 0.85, 1)
+    favEmptyLabel:SetText("No favorites yet. Pick a route, then '+ Add Current Route'.")
+    favEmptyLabel:Show(false)
+
+    favRowWidgets = {}
+    local listTop = 90
+    local rowWidth = FAV_WINDOW_WIDTH - 30 - FAV_SLIDER_W - 4
+    for i = 1, FAV_MAX_VISIBLE do
+        local row = favoritesWindow:CreateChildWidget("window", "favRow" .. i, 0, true)
+        row:SetExtent(rowWidth, FAV_ROW_HEIGHT - 4)
+        row:AddAnchor("TOPLEFT", favoritesWindow, 15, listTop + (i - 1) * FAV_ROW_HEIGHT)
+        row:Show(false)
+
+        -- Fixed-width left-aligned label that clips long names (auctionfavs
+        -- pattern: SetAutoResize(false)), with a transparent click button on top.
+        local clickW = rowWidth - 30
+        local label = row:CreateChildWidget("label", "favLabel" .. i, 0, true)
+        label:SetExtent(clickW, FAV_ROW_HEIGHT - 4)
+        label:AddAnchor("LEFT", row, 4, 0)
+        label.style:SetFontSize(13)
+        label.style:SetColorByKey("brown")
+        label.style:SetAlign(ALIGN_LEFT)
+        label:SetAutoResize(false)
+        label:SetText("")
+        label:Show(true)
+
+        local applyBtn = row:CreateChildWidget("button", "favApply" .. i, 0, true)
+        applyBtn:SetExtent(clickW, FAV_ROW_HEIGHT - 4)
+        applyBtn:AddAnchor("LEFT", row, 0, 0)
+        applyBtn:Show(true)
+
+        -- Built-in close/delete icon (same as auctionfavs: btn_close_default).
+        local removeBtn = row:CreateChildWidget("button", "favRemove" .. i, 0, true)
+        removeBtn:SetStyle("btn_close_default")
+        removeBtn:AddAnchor("RIGHT", row, -2, 0)
+        removeBtn:Show(true)
+
+        favRowWidgets[i] = { row = row, label = label, applyBtn = applyBtn, removeBtn = removeBtn }
+    end
+
+    -- Scrollbar (mirrors auctionfavs: up/down buttons + slider + draggable thumb).
+    local listAreaH = FAV_MAX_VISIBLE * FAV_ROW_HEIGHT
+    favSliderFrame = favoritesWindow:CreateChildWidget("emptywidget", "favSliderFrame", 0, true)
+    favSliderFrame:SetExtent(FAV_SLIDER_W, listAreaH)
+    favSliderFrame:AddAnchor("TOPRIGHT", favoritesWindow, -12, listTop)
+
+    local upButton = favSliderFrame:CreateChildWidget("button", "favUpBtn", 0, true)
+    upButton:SetExtent(FAV_SLIDER_W, 12)
+    upButton:AddAnchor("TOPRIGHT", favSliderFrame, 0, 0)
+    upButton:SetStyle("slider_scroll_button_up")
+
+    local downButton = favSliderFrame:CreateChildWidget("button", "favDownBtn", 0, true)
+    downButton:SetExtent(FAV_SLIDER_W, 12)
+    downButton:AddAnchor("BOTTOMRIGHT", favSliderFrame, 0, 0)
+    downButton:SetStyle("slider_scroll_button_down")
+
+    favSlider = favSliderFrame:CreateChildWidget("slider", "favSlider", 0, true)
+    favSlider:AddAnchor("TOPLEFT",     upButton,   "BOTTOMLEFT", 0, 0)
+    favSlider:AddAnchor("BOTTOMRIGHT", downButton, "TOPRIGHT",   0, 0)
+    favSlider:SetOrientation(0)
+
+    local sliderBg = favSlider:CreateDrawable("ui/button/scroll_button.dds", "scroll_frame_bg", "background")
+    sliderBg:SetTextureColor("default")
+    sliderBg:AddAnchor("TOPLEFT",     favSlider,  3, -9)
+    sliderBg:AddAnchor("BOTTOMRIGHT", favSlider, -3,  9)
+
+    local thumb = favSlider:CreateChildWidget("button", "favSliderThumb", 0, true)
+    thumb:EnableDrag(true)
+    thumb:SetWidth(FAV_SLIDER_W)
+
+    local thumbNormal = thumb:CreateDrawable("ui/button/scroll_button.dds", "thumb_df", "background")
+    thumbNormal:AddAnchor("TOPLEFT",     thumb, 0, 0)
+    thumbNormal:AddAnchor("BOTTOMRIGHT", thumb, 0, 0)
+    thumb:SetNormalBackground(thumbNormal)
+
+    local thumbHi = thumb:CreateDrawable("ui/button/scroll_button.dds", "thumb_ov", "background")
+    thumbHi:AddAnchor("TOPLEFT",     thumb, 0, 0)
+    thumbHi:AddAnchor("BOTTOMRIGHT", thumb, 0, 0)
+    thumb:SetHighlightBackground(thumbHi)
+
+    local thumbPushed = thumb:CreateDrawable("ui/button/scroll_button.dds", "thumb_on", "background")
+    thumbPushed:AddAnchor("TOPLEFT",     thumb, 0, 0)
+    thumbPushed:AddAnchor("BOTTOMRIGHT", thumb, 0, 0)
+    thumb:SetPushedBackground(thumbPushed)
+
+    favSlider:SetThumbButtonWidget(thumb)
+    favSlider:SetMinMaxValues(0, 0)
+    favSlider:SetValueStep(1)
+    favSlider:SetValue(0, false)
+
+    favSlider:SetHandler("OnSliderChanged", function(self, value)
+        favScrollOffset = math.floor(value or 0)
+        RefreshFavoritesList(false)
+    end)
+
+    upButton:SetHandler("OnClick", function()
+        if favScrollOffset > 0 then
+            favScrollOffset = favScrollOffset - 1
+            RefreshFavoritesList(true)
+        end
+    end)
+
+    downButton:SetHandler("OnClick", function()
+        if favScrollOffset < math.max(0, #favorites - FAV_MAX_VISIBLE) then
+            favScrollOffset = favScrollOffset + 1
+            RefreshFavoritesList(true)
+        end
+    end)
+
+    function favoritesWindow:OnWheelUp()
+        if favScrollOffset > 0 then
+            favScrollOffset = favScrollOffset - 1
+            RefreshFavoritesList(true)
+        end
+    end
+    favoritesWindow:SetHandler("OnWheelUp", favoritesWindow.OnWheelUp)
+
+    function favoritesWindow:OnWheelDown()
+        if favScrollOffset < math.max(0, #favorites - FAV_MAX_VISIBLE) then
+            favScrollOffset = favScrollOffset + 1
+            RefreshFavoritesList(true)
+        end
+    end
+    favoritesWindow:SetHandler("OnWheelDown", favoritesWindow.OnWheelDown)
+
+    return favoritesWindow
+end
+
+function ToggleFavoritesWindow()
+    if not favoritesWindow then
+        CreateFavoritesWindow()
+    end
+    if favoritesWindow:IsVisible() then
+        favoritesWindow:Show(false)
     else
-        local addonName = "Folio%202.0"
-        local url = string.format("https://archerageaddonmanager.github.io/addon-version-checker/?addon=%s&version=%s", 
-                                 addonName, ADDON_VERSION)
-        
-        window.webbrowser:RequestExternalPage("about:blank")
-        window.webbrowser:RequestExternalPage(url)
-        window:Show(true)
+        RefreshFavoritesList()
+        favoritesWindow:Show(true)
     end
 end
 
@@ -1295,24 +1554,25 @@ function CreateMainWindow()
     title.style:SetAlign(ALIGN_CENTER)
     title.style:SetColorByKey("brown")
 
-    local versionButton = CreateActionButton({
+    -- Directly under the Max Freshness button (TOPRIGHT -60, 10, 120x30).
+    local favoritesButton = CreateActionButton({
         parent = mainWindow,
-        name = "version_button",
+        name = "favorites_button",
         anchor = "TOPRIGHT",
         anchorTarget = mainWindow,
-        offsetX = -280,
-        offsetY = 12,
-        width = 25,
-        height = 25,
-        text = "?",
+        offsetX = -60,
+        offsetY = 41,
+        width = 120,
+        height = 28,
+        text = "Favorites",
         skin = "text_default",
         handlers = {
             OnClick = function()
-                CheckAddonVersion()
+                ToggleFavoritesWindow()
             end,
         },
     })
-    versionButton:Show(true)
+    favoritesButton:Show(true)
 
     loadingLabel = mainWindow:CreateChildWidget("label", "loadingLabel", 0, true)
     loadingLabel:AddAnchor("TOPLEFT", mainWindow, 20, 25)
@@ -1463,6 +1723,7 @@ function CreateMainWindow()
                     if selectedFromZone == previousSelectedToZone then
                         selectedToZone = nil
                         toZoneGroup = nil
+                        CancelPendingAuctions()
                     else
                         local isValidOldToZone = false
                         if previousSelectedToZone then
@@ -1480,6 +1741,7 @@ function CreateMainWindow()
                         else
                             selectedToZone = nil
                             toZoneGroup = nil
+                            CancelPendingAuctions()
                         end
                     end
                 end
@@ -1488,7 +1750,7 @@ function CreateMainWindow()
                     if toZoneComboBoxes[continent] and toZoneComboBoxes[continent].Destroy then
                         toZoneComboBoxes[continent]:Destroy()
                     end
-                    
+
                     toZoneComboBoxes[continent] = CreateComboBox(
                         mainWindow, 
                         comboBoxConfig.triggerWidth, 
@@ -1501,12 +1763,12 @@ function CreateMainWindow()
                         comboBoxConfig.toZoneX, 
                         comboBoxConfig.Y 
                     )
-                    lastFromZoneForToZoneComboBox[continent] = selectedFromZone 
+                    lastFromZoneForToZoneComboBox[continent] = selectedFromZone
                 end
-                
+
                 toZoneComboBoxes[continent]:Show(true)
-                toZoneComboBoxes[continent]:AddAnchor("BOTTOMLEFT", mainWindow, comboBoxConfig.toZoneX, comboBoxConfig.Y) 
-                
+                toZoneComboBoxes[continent]:AddAnchor("BOTTOMLEFT", mainWindow, comboBoxConfig.toZoneX, comboBoxConfig.Y)
+
                 if continent == "Auroria" then
                     toZoneComboBoxes[continent]:SetText("Heedmar")
                 elseif selectedToZone then
@@ -1514,7 +1776,7 @@ function CreateMainWindow()
                 else
                     toZoneComboBoxes[continent]:SetText("")
                 end
-                emptyToZoneComboBox:Show(false) 
+                emptyToZoneComboBox:Show(false)
 
                 if selectedFromZone and selectedToZone then
                     checkPackRatio(fromZoneGroup, toZoneGroup)
@@ -1894,12 +2156,43 @@ function CreateMainWindow()
             if currentContinent then
                 ShowComboBoxes(currentContinent)
             end
+            -- Favorites is open by default whenever the Folio window opens.
+            if favoritesWindow then
+                RefreshFavoritesList()
+                favoritesWindow:Show(true)
+            end
         end
         SettingWindowSkin(mainWindow)
-        mainWindow:SetStartAnimation(true, true)        
+        mainWindow:SetStartAnimation(true, true)
     end
     mainWindow:SetHandler("OnShow", mainWindow.OnShow)
- 
+
+    -- Apply a saved favorite route: set the zone state, sync the combo boxes,
+    -- and (via ShowComboBoxes) request the ratio. Defined here so it can reach
+    -- the local ShowComboBoxes and the Continent combo box.
+    function ApplyFavoriteRoute(continent, fromZone, toZone)
+        if not mainWindow then return end
+        mainWindow:Show(true)
+
+        if currentContinent ~= continent then
+            resetZoneSelectionsAndDisplays()
+            currentContinent = continent
+        end
+        if Continent then
+            Continent:SetText(continent)
+        end
+
+        selectedFromZone = fromZone
+        fromZoneGroup = fromZone
+        selectedToZone = toZone
+        toZoneGroup = toZone
+
+        ShowComboBoxes(continent)
+    end
+
+    -- Build the attached Favorites window now so it can open alongside Folio.
+    CreateFavoritesWindow()
+
     return mainWindow
 end
 
@@ -2019,6 +2312,12 @@ end
 
 function checkPackRatio(fromZoneGroup, toZoneGroup)
     if not selectedFromZone or not selectedToZone then
+        return
+    end
+
+    -- Never request a same-zone ratio: the native GetSpecialtyRatioBetween
+    -- crashes (or returns garbage) when from == to.
+    if fromZoneGroup == toZoneGroup then
         return
     end
     
@@ -2194,9 +2493,10 @@ function StartAuctionRequestsForCurrentPacks()
 end
 
 local function EnteredWorld()
-    LoadSavedPositions()  
+    LoadSavedPositions()
     getLocalizedNames()
-    commerceSkill = GetCommerceSkill() 
+    LoadFavorites()
+    commerceSkill = GetCommerceSkill()
     CreateToggleButton()
     CreateMainWindow()
     cooldownUpdater:SetHandler("OnUpdate", cooldownUpdater.OnUpdate)

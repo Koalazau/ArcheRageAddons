@@ -50,6 +50,13 @@ local commerceSkill = 0
 local buttonSize = 22
 local maxFreshnessEnabled = false
 local freshnessToggleButton = nil
+
+-- Prices include the Commerce proficiency bonus by default, since that is what
+-- the player actually receives. Toggling it off shows the unmodified base
+-- price, for comparing against a wiki or against someone else's numbers.
+local proficiencyEnabled = true
+local proficiencyToggleButton = nil
+
 local requestCooldown = 0
 local cooldownDuration = 6
 local cooldownStartTime = 0 
@@ -153,6 +160,9 @@ local function SetButtonsEnabled(enabled)
     if freshnessToggleButton then
         freshnessToggleButton:Enable(enabled)
     end
+    if proficiencyToggleButton then
+        proficiencyToggleButton:Enable(enabled)
+    end
     if refreshButton then
         refreshButton:Enable(enabled)
     end
@@ -253,6 +263,8 @@ local function LoadSavedPositions()
             local setting, value = line:match("([^,]+):([^,]+)")
             if setting == "maxFreshness" then
                 maxFreshnessEnabled = (value == "true")
+            elseif setting == "proficiency" then
+                proficiencyEnabled = (value == "true")
             end
         end
         file:close()
@@ -267,7 +279,8 @@ local function SaveSettings()
         end
         
         file:write(string.format("maxFreshness:%s\n", tostring(maxFreshnessEnabled)))
-        
+        file:write(string.format("proficiency:%s\n", tostring(proficiencyEnabled)))
+
         file:close()
     end
 end
@@ -436,7 +449,12 @@ local function GetCommerceSkill()
 end
 
 local function CalculatePrice(basePrice, demandRate, packName)
-    local professionalBonus = 1 + (commerceSkill / 10000 * 0.05)
+    -- 1.0 leaves the price untouched, so the toggle needs no branch downstream.
+    local professionalBonus = 1.0
+    if proficiencyEnabled then
+        professionalBonus = 1 + (commerceSkill / 10000 * 0.05)
+    end
+
     local freshnessBonus = 1.0
     
     if maxFreshnessEnabled and packName then
@@ -454,6 +472,42 @@ local function CalculatePrice(basePrice, demandRate, packName)
     
     local price = (basePrice * demandRate) * professionalBonus * freshnessBonus
     return math.floor(price)
+end
+
+-- Shared by the toggle and by button creation so the two cannot disagree about
+-- what the current state looks like.
+local function UpdateProficiencyButton()
+    if not proficiencyToggleButton then return end
+    if proficiencyEnabled then
+        proficiencyToggleButton:SetText("Prof: ON")
+        proficiencyToggleButton:SetTextColor(0, 1, 0, 1)
+    else
+        proficiencyToggleButton:SetText("Prof: OFF")
+        proficiencyToggleButton:SetTextColor(color.normal[1], color.normal[2],
+                                             color.normal[3], color.normal[4])
+    end
+end
+
+local function ToggleProficiency()
+    proficiencyEnabled = not proficiencyEnabled
+    UpdateProficiencyButton()
+    SaveSettings()
+
+    -- Prices are computed when the ratio is fetched, not when they are drawn,
+    -- so the table has to be rebuilt for the change to appear.
+    if selectedFromZone and selectedToZone then
+        if requestCooldown > 0 then
+            -- checkPackRatio refuses to run during the cooldown, so silently
+            -- calling it would leave the old prices on screen while the button
+            -- claims otherwise. Say so rather than showing a stale total.
+            X2Chat:DispatchChatMessage(CMF_SYSTEM,
+                "|cFFFFAA00[Folio] Proficiency " ..
+                (proficiencyEnabled and "on" or "off") ..
+                " - prices update when the refresh cooldown ends.|r")
+        else
+            checkPackRatio(fromZoneGroup, toZoneGroup)
+        end
+    end
 end
 
 local function ToggleMaxFreshness()
@@ -1554,13 +1608,13 @@ function CreateMainWindow()
     title.style:SetAlign(ALIGN_CENTER)
     title.style:SetColorByKey("brown")
 
-    -- Directly under the Max Freshness button (TOPRIGHT -60, 10, 120x30).
+    -- Directly under the Max Freshness button (TOPRIGHT -95, 10, 120x30).
     local favoritesButton = CreateActionButton({
         parent = mainWindow,
         name = "favorites_button",
         anchor = "TOPRIGHT",
         anchorTarget = mainWindow,
-        offsetX = -60,
+        offsetX = -95,
         offsetY = 41,
         width = 120,
         height = 28,
@@ -1638,8 +1692,8 @@ function CreateMainWindow()
         name = "refresh",
         anchor = "TOPRIGHT",
         anchorTarget = mainWindow,
-        offsetX = -190, 
-        offsetY = 11, 
+        offsetX = -225,
+        offsetY = 11,
         skin = resetskin,
         width = 28,
         height = 28,
@@ -1663,7 +1717,7 @@ function CreateMainWindow()
 
     freshnessToggleButton = mainWindow:CreateChildWidget("button", "freshnessToggleButton", 0, true)
     freshnessToggleButton:SetStyle("text_default")
-    freshnessToggleButton:AddAnchor("TOPRIGHT", mainWindow, -60, 10)  
+    freshnessToggleButton:AddAnchor("TOPRIGHT", mainWindow, -95, 10)
     freshnessToggleButton:Show(true)
     freshnessToggleButton:SetText("Max Freshness")
     freshnessToggleButton:SetExtent(120, 30)  
@@ -1678,6 +1732,22 @@ function CreateMainWindow()
     else
         freshnessToggleButton:SetTextColor(color.normal[1], color.normal[2], color.normal[3], color.normal[4])
     end
+
+    -- Directly under the close button, sharing its right edge so the two form a
+    -- column. Wider than the X because the label has to say what it toggles;
+    -- the rest of the top bar was shifted left by 35 to make room.
+    proficiencyToggleButton = mainWindow:CreateChildWidget("button", "proficiencyToggleButton", 0, true)
+    proficiencyToggleButton:SetStyle("text_default")
+    proficiencyToggleButton:AddAnchor("TOPRIGHT", mainWindow, -10, 41)
+    proficiencyToggleButton:Show(true)
+    proficiencyToggleButton:SetExtent(78, 28)
+
+    function proficiencyToggleButton:OnClick()
+        ToggleProficiency()
+    end
+    proficiencyToggleButton:SetHandler("OnClick", proficiencyToggleButton.OnClick)
+
+    UpdateProficiencyButton()
 
     local function ShowComboBoxes(continent)
         for _, cb in pairs(fromZoneComboBoxes) do
